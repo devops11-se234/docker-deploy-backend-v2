@@ -32,12 +32,35 @@ jobs:
           push: true
           tags: ${{ secrets.DOCKER_HUB_USERNAME }}/234-deploylab-backend:latest
 
-      - name: Copy file via ssh password
+      - name: Validate deploy secrets
+        env:
+          HOST_SERVER: ${{ secrets.HOST_SERVER }}
+          HOST_USER_NAME: ${{ secrets.HOST_USER_NAME }}
+          HOST_SSH_PRIVATE_KEY: ${{ secrets.HOST_SSH_PRIVATE_KEY }}
+        run: |
+          test -n "$HOST_SERVER" || { echo "Missing secret: HOST_SERVER"; exit 1; }
+          test -n "$HOST_USER_NAME" || { echo "Missing secret: HOST_USER_NAME"; exit 1; }
+          test -n "$HOST_SSH_PRIVATE_KEY" || { echo "Missing secret: HOST_SSH_PRIVATE_KEY"; exit 1; }
+          echo "$HOST_SSH_PRIVATE_KEY" | grep -Eq "BEGIN (OPENSSH|RSA|EC|DSA) PRIVATE KEY|BEGIN PRIVATE KEY" || {
+            echo "HOST_SSH_PRIVATE_KEY does not look like a valid private key.";
+            exit 1;
+          }
+
+      - name: Check SSH reachability
+        env:
+          HOST_SERVER: ${{ secrets.HOST_SERVER }}
+        run: |
+          timeout 10 bash -c "cat < /dev/null > /dev/tcp/$HOST_SERVER/22" \
+            && echo "SSH port is reachable on $HOST_SERVER:22" \
+            || { echo "Cannot reach $HOST_SERVER:22 from GitHub Actions runner"; exit 1; }
+
+      - name: Copy file via ssh key
         uses: appleboy/scp-action@v1
         with:
           host: ${{ secrets.HOST_SERVER }}
           username: ${{ secrets.HOST_USER_NAME }}
           key: ${{ secrets.HOST_SSH_PRIVATE_KEY }}
+          passphrase: ${{ secrets.HOST_SSH_PASSPHRASE }}
           port: 22
           source: "docker-compose.yml"
           target: "/home/ubuntu/backend"
@@ -48,6 +71,7 @@ jobs:
           host: ${{ secrets.HOST_SERVER }}
           username: ${{ secrets.HOST_USER_NAME }}
           key: ${{ secrets.HOST_SSH_PRIVATE_KEY }}
+          passphrase: ${{ secrets.HOST_SSH_PASSPHRASE }}
           port: 22
           script: |
             cd /home/ubuntu/backend
