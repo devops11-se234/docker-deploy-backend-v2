@@ -11,6 +11,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      SSH_PORT: ${{ secrets.HOST_SSH_PORT || '22' }}
 
     steps:
       - name: Checkout code
@@ -49,10 +51,11 @@ jobs:
       - name: Check SSH reachability
         env:
           HOST_SERVER: ${{ secrets.HOST_SERVER }}
+          SSH_PORT: ${{ env.SSH_PORT }}
         run: |
-          timeout 10 bash -c "cat < /dev/null > /dev/tcp/$HOST_SERVER/22" \
-            && echo "SSH port is reachable on $HOST_SERVER:22" \
-            || { echo "Cannot reach $HOST_SERVER:22 from GitHub Actions runner"; exit 1; }
+          timeout 10 bash -c "cat < /dev/null > /dev/tcp/$HOST_SERVER/$SSH_PORT" \
+            && echo "SSH port is reachable on $HOST_SERVER:$SSH_PORT" \
+            || { echo "Cannot reach $HOST_SERVER:$SSH_PORT from GitHub Actions runner"; exit 1; }
 
       - name: Copy file via ssh key
         uses: appleboy/scp-action@v1
@@ -61,7 +64,7 @@ jobs:
           username: ${{ secrets.HOST_USER_NAME }}
           key: ${{ secrets.HOST_SSH_PRIVATE_KEY }}
           passphrase: ${{ secrets.HOST_SSH_PASSPHRASE }}
-          port: 22
+          port: ${{ env.SSH_PORT }}
           source: "docker-compose.yml"
           target: "/home/ubuntu/backend"
 
@@ -72,7 +75,7 @@ jobs:
           username: ${{ secrets.HOST_USER_NAME }}
           key: ${{ secrets.HOST_SSH_PRIVATE_KEY }}
           passphrase: ${{ secrets.HOST_SSH_PASSPHRASE }}
-          port: 22
+          port: ${{ env.SSH_PORT }}
           script: |
             cd /home/ubuntu/backend
             echo ${{ secrets.DOCKER_HUB_TOKEN }} | docker login --username ${{ secrets.DOCKER_HUB_USERNAME }} --password-stdin
