@@ -2,6 +2,8 @@ services:
   backend:
     image: guykongthongcmu/234-deploylab-backend:latest
     pull_policy: always
+    environment:
+      PORT: 8080
     ports:
     - "8082:8080"
     restart: unless-stopped
